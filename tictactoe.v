@@ -29,16 +29,15 @@ const (
 
 struct App {
 mut:
-	gg          &gg.Context
-	board       []int = []int{len: 9, init: no_mark}
-	player_mark int   = p1_mark
-	running     bool  = true
+	gg              &gg.Context
+	board           []int = []int{len: 9, init: no_mark}
+	player_mark     int   = p1_mark
+	running         bool  = true
+	remaining_moves int   = 9
+	game_won        bool
 }
 
 fn init(mut app App) {
-	app.gg.draw_rect_filled(0, 0, app.gg.width, app.gg.height, gx.black)
-
-	app.draw()
 }
 
 fn (app &App) block(ndx int) (f32, f32) {
@@ -57,7 +56,7 @@ fn (app &App) block(ndx int) (f32, f32) {
 	return block_x, block_y
 }
 
-fn (app &App) draw_board() {
+fn (mut app App) draw_board() {
 	for i in 0 .. app.board.len {
 		piece := app.board[i]
 
@@ -78,11 +77,22 @@ fn (app &App) draw_board() {
 }
 
 fn (mut app App) draw_win() {
-	if app.running {
+	if app.running || !app.game_won {
 		return
 	}
 	app.gg.draw_text(start_x + block_size_x, start_y + block_size_y, 'Player $app.player_mark Won!',
 		size: 22, color: gx.green)
+}
+
+fn (mut app App) draw_tie() {
+	if app.running || app.game_won {
+		return
+	}
+
+	app.gg.draw_text(start_x + block_size_x, start_y + block_size_y, 'Tie Game!',
+		size: 22
+		color: gx.green
+	)
 }
 
 fn (mut app App) toggle_player() {
@@ -91,12 +101,15 @@ fn (mut app App) toggle_player() {
 	} else {
 		p1_mark
 	}
+
+	app.remaining_moves--
 }
 
 fn (mut app App) draw() {
 	app.gg.begin()
 	app.draw_board()
 	app.draw_win()
+	app.draw_tie()
 	app.gg.end()
 }
 
@@ -104,8 +117,7 @@ fn frame(mut app App) {
 	app.draw()
 }
 
-fn click(x f32, y f32, button gg.MouseButton, data voidptr) {
-	mut app := &App(data)
+fn click(x f32, y f32, button gg.MouseButton, mut app App) {
 	if !app.running {
 		return
 	}
@@ -142,17 +154,26 @@ fn click(x f32, y f32, button gg.MouseButton, data voidptr) {
 			}
 		}
 
-		if !has_won {
-			// toggle players
-			app.toggle_player()
-		} else {
+		if has_won {
+			app.game_won = true
 			app.running = false
+
+			return
 		}
+
+		if !has_won && app.remaining_moves == 1 {
+			app.running = false
+
+			return
+		}
+
+		app.toggle_player()
 
 		break
 	}
 }
 
+[no_console]
 fn main() {
 	mut app := &App{
 		gg: 0
